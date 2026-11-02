@@ -7,6 +7,7 @@ use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Http\Exceptions\ThrottleRequestsException;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
@@ -111,6 +112,14 @@ class ApiErrorRenderer
 
         $exceptions->render(function (Throwable $exception, Request $request) {
             if (! self::isApi($request)) {
+                return null;
+            }
+
+            // HttpResponseException transporte déjà une réponse complète
+            // (par exemple le message personnalisé d'un limiteur de débit) :
+            // le framework doit la renvoyer telle quelle, sans passer par le
+            // rendu générique ci-dessous.
+            if ($exception instanceof HttpResponseException) {
                 return null;
             }
 
