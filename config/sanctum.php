@@ -50,7 +50,8 @@ return [
     |
     */
 
-    'expiration' => null,
+    // 480 minutes (8 h) par défaut pour les jetons d'administration.
+    'expiration' => (int) env('SANCTUM_EXPIRATION', 480),
 
     /*
     |--------------------------------------------------------------------------
