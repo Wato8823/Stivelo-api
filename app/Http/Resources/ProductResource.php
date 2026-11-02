@@ -20,7 +20,9 @@ class ProductResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $options = $this->whenLoaded('options', fn () => $this->options->where('is_active', true));
+        $options = $this->relationLoaded('options')
+            ? $this->options->where('is_active', true)
+            : collect();
 
         return [
             'id' => $this->id,
@@ -37,15 +39,9 @@ class ProductResource extends JsonResource
             'category' => new CategoryResource($this->whenLoaded('category')),
             'media' => ProductMediaResource::collection($this->whenLoaded('media')),
             'options' => [
-                'colors' => $options
-                    ? ProductOptionResource::collection($options->where('type', ProductOptionType::Color)->values())
-                    : [],
-                'fabrics' => $options
-                    ? ProductOptionResource::collection($options->where('type', ProductOptionType::Fabric)->values())
-                    : [],
-                'sizes' => $options
-                    ? ProductOptionResource::collection($options->where('type', ProductOptionType::Size)->values())
-                    : [],
+                'colors' => ProductOptionResource::collection($options->where('type', ProductOptionType::Color)->values()),
+                'fabrics' => ProductOptionResource::collection($options->where('type', ProductOptionType::Fabric)->values()),
+                'sizes' => ProductOptionResource::collection($options->where('type', ProductOptionType::Size)->values()),
             ],
             'measurement_guide' => MeasurementFieldResource::collection($this->whenLoaded('measurementFields')),
             'whatsapp_url' => $this->whatsAppUrl(),

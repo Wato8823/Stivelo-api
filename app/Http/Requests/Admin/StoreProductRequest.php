@@ -91,11 +91,10 @@ class StoreProductRequest extends FormRequest
     protected function slugUniqueRule(): mixed
     {
         $product = $this->route('product');
+        $rule = Rule::unique('products', 'slug');
 
-        return Rule::unique('products', 'slug')->when(
-            $product instanceof Product,
-            fn ($rule) => $rule->ignore($product->id),
-        );
+        // En mise à jour, le slug du modèle courant ne se concurrence pas.
+        return $product instanceof Product ? $rule->ignore($product->id) : $rule;
     }
 
     /**

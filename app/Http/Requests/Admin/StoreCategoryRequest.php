@@ -23,6 +23,11 @@ class StoreCategoryRequest extends FormRequest
     public function rules(): array
     {
         $category = $this->route('category');
+        $uniqueSlug = Rule::unique('categories', 'slug');
+
+        if ($category instanceof Category) {
+            $uniqueSlug = $uniqueSlug->ignore($category->id);
+        }
 
         return [
             'name' => ['required', 'string', 'min:2', 'max:120'],
@@ -31,10 +36,7 @@ class StoreCategoryRequest extends FormRequest
                 'string',
                 'max:140',
                 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/',
-                Rule::unique('categories', 'slug')->when(
-                    $category instanceof Category,
-                    fn ($rule) => $rule->ignore($category->id),
-                ),
+                $uniqueSlug,
             ],
             'description' => ['nullable', 'string', 'max:500'],
             'sort_order' => ['nullable', 'integer', 'min:0', 'max:999'],
