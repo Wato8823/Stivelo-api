@@ -15,6 +15,7 @@ use App\Support\CatalogCache;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class ProductController extends Controller
@@ -77,6 +78,7 @@ class ProductController extends Controller
             $this->syncOptions($product, ProductOptionType::Fabric, $request->input('fabrics', []));
             $this->syncOptions($product, ProductOptionType::Size, $request->input('sizes', []));
             $this->syncMeasurements($product, $request->input('measurement_fields', []));
+            $this->storeImages($request, $product);
 
             return $product;
         });
@@ -149,6 +151,26 @@ class ProductController extends Controller
         CatalogCache::flush();
 
         return response()->json(['message' => 'Modèle archivé.']);
+    }
+
+    private function storeImages(StoreProductRequest $request, Product $product): void
+    {
+        $disk = (string) config('catalog.media.disk', 'public');
+        $alts = $request->input('image_alts', []);
+
+        foreach ($request->file('images', []) as $position => $file) {
+            $key = $file->store('products/'.$product->id, $disk);
+            $dimensions = @getimagesize($file->getRealPath()) ?: [null, null];
+
+            $product->media()->create([
+                'disk' => $disk,
+                'storage_key' => $key,
+                'alt' => filled($alts[$position] ?? null) ? $alts[$position] : $product->name,
+                'sort_order' => $position + 1,
+                'width' => $dimensions[0],
+                'height' => $dimensions[1],
+            ]);
+        }
     }
 
     /**

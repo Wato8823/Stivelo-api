@@ -72,6 +72,33 @@ class CatalogueManagementTest extends TestCase
         $this->assertDatabaseHas('product_options', ['product_id' => $product->id, 'type' => 'color', 'value' => 'bleu-nuit']);
     }
 
+    public function test_un_administrateur_peut_televerser_des_images_a_la_creation_du_modele(): void
+    {
+        Storage::fake('public');
+        $this->actingAsRole(UserRole::Admin);
+        $category = Category::factory()->create();
+
+        $response = $this->post('/api/v1/admin/products', $this->productPayload($category, [
+            'images' => [
+                UploadedFile::fake()->image('veste-face.jpg', 800, 1000),
+                UploadedFile::fake()->image('veste-dos.jpg', 800, 1000),
+            ],
+            'image_alts' => ['Vue de face de la veste'],
+        ]));
+
+        $response->assertCreated()
+            ->assertJsonCount(2, 'data.media')
+            ->assertJsonPath('data.media.0.alt', 'Vue de face de la veste')
+            ->assertJsonPath('data.media.1.alt', 'Veste de Costume Milano');
+
+        $this->assertDatabaseCount('product_media', 2);
+        $storedFiles = Storage::disk('public')->allFiles('products/'.$response->json('data.id'));
+        $this->assertCount(2, $storedFiles);
+        foreach ($storedFiles as $path) {
+            Storage::disk('public')->assertExists($path);
+        }
+    }
+
     public function test_un_conseiller_ne_peut_pas_creer_de_modele(): void
     {
         $this->actingAsRole(UserRole::Advisor);
