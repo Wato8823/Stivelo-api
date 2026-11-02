@@ -16,7 +16,10 @@ class CatalogTest extends TestCase
 
     private function makeProduct(array $attributes = []): Product
     {
-        $category = Category::factory()->create(['name' => 'Costume et veste', 'slug' => 'costume-veste']);
+        $category = Category::firstOrCreate(
+            ['slug' => 'costume-veste'],
+            ['name' => 'Costume et veste', 'description' => 'Costumes et vestes.', 'is_active' => true],
+        );
 
         return Product::factory()->create(array_merge([
             'category_id' => $category->id,

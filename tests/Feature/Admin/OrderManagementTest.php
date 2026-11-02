@@ -79,8 +79,11 @@ class OrderManagementTest extends TestCase
         $response = $this->getJson('/api/v1/admin/orders/'.$order->id)->assertOk();
 
         $response->assertJsonPath('data.items.0.measurements.0.key', 'chest_cm')
-            ->assertJsonPath('data.items.0.measurements.0.value', 102.0)
             ->assertJsonStructure(['data' => ['events', 'allowed_next_statuses'], 'whatsapp_url']);
+
+        // MySQL et PostgreSQL ne sérialisent pas les décimaux de la même
+        // manière (102.0 / 102) : on compare la valeur numérique.
+        $this->assertEqualsWithDelta(102.0, (float) $response->json('data.items.0.measurements.0.value'), 0.001);
     }
 
     public function test_un_changement_de_statut_valide_est_journalise(): void

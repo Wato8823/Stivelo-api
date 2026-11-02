@@ -48,9 +48,4 @@ class Category extends Model
     {
         return $query->orderBy('sort_order')->orderBy('name');
     }
-
-    public function getRouteKeyName(): string
-    {
-        return 'slug';
-    }
 }

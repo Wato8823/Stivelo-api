@@ -17,7 +17,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('order_id')->constrained()->cascadeOnDelete();
             $table->foreignId('product_id')->nullable()->constrained()->nullOnDelete();
-            $table->jsonb('product_snapshot');
+            $table->json('product_snapshot');
             $table->unsignedInteger('unit_price')->default(0);
             $table->unsignedSmallInteger('quantity')->default(1);
             $table->unsignedInteger('line_total')->default(0);

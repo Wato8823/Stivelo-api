@@ -1,10 +1,11 @@
 # Stive Clothing — API
 
-API REST **Laravel 12 + PostgreSQL** de la boutique **Stive Clothing** :
+API REST **Laravel 12 + MySQL 8** de la boutique **Stive Clothing** :
 catalogue de vêtements personnalisables, prise de mesures sur mesure,
 demande de commande transmise par WhatsApp et administration sécurisée.
 
 - 📘 **Guide de développement (chaque étape)** : [`docs/DEVELOPPEMENT.md`](docs/DEVELOPPEMENT.md)
+- 🛠️ **Installation locale (outils + Git)** : [`docs/INSTALLATION.md`](docs/INSTALLATION.md)
 - 📄 **Contrat OpenAPI 3.1** : [`docs/openapi.yaml`](docs/openapi.yaml) — aussi servi par `GET /docs/openapi.yaml`
 
 ## Démarrage rapide
@@ -12,7 +13,7 @@ demande de commande transmise par WhatsApp et administration sécurisée.
 ```bash
 composer install
 cp .env.example .env && php artisan key:generate
-docker compose up -d db            # PostgreSQL 16
+docker compose up -d db            # MySQL 8.4 (+ base de test)
 php artisan migrate --seed
 php artisan storage:link
 php artisan serve                  # http://localhost:8000

@@ -5,25 +5,29 @@ on:
     branches: [main, 'arena/**']
   pull_request:
 
+permissions:
+  contents: write
+
 jobs:
   tests:
-    name: PHP 8.3 · PostgreSQL 16
+    name: PHP 8.3 · MySQL 8.4
     runs-on: ubuntu-latest
 
     services:
-      postgres:
-        image: postgres:16
+      mysql:
+        image: mysql:8.4
         env:
-          POSTGRES_DB: stive_clothing_test
-          POSTGRES_USER: stive
-          POSTGRES_PASSWORD: secret
+          MYSQL_DATABASE: stive_clothing_test
+          MYSQL_USER: stive
+          MYSQL_PASSWORD: secret
+          MYSQL_ROOT_PASSWORD: root-secret
         ports:
-          - 5432:5432
+          - 3306:3306
         options: >-
-          --health-cmd="pg_isready -U stive"
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -ustive -psecret"
           --health-interval=10s
           --health-timeout=5s
-          --health-retries=5
+          --health-retries=10
 
     steps:
       - uses: actions/checkout@v4
@@ -32,7 +36,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
-          extensions: pdo_pgsql, gd, mbstring, bcmath, intl
+          extensions: pdo_mysql, gd, mbstring, bcmath, intl
           coverage: none
 
       - name: Cache Composer
@@ -54,4 +58,25 @@ jobs:
         continue-on-error: true
 
       - name: Tests
-        run: php artisan test
+        run: |
+          set -o pipefail
+          php artisan test 2>&1 | tee /tmp/tests.log
+          rc=$?
+          exit "$rc"
+
+      # Diagnostic : en cas d'échec, le journal des tests est publié en
+      # commentaire de commit pour être consultable sans accès aux journaux
+      # d'Actions.
+      - name: Publier le journal des tests en cas d'échec
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo "### Échec des tests — extrait du journal"
+            echo '```'
+            tail -c 6000 /tmp/tests.log 2>/dev/null || echo "(journal indisponible)"
+            echo '```'
+          } > /tmp/comment.md
+          gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/comments" \
+            -F body=@/tmp/comment.md || true
