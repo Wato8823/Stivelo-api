@@ -23,15 +23,24 @@
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_STORE" value="array"/>
-        <env name="DB_CONNECTION" value="mysql"/>
-        <env name="DB_HOST" value="127.0.0.1"/>
-        <env name="DB_PORT" value="3306"/>
-        <env name="DB_DATABASE" value="stive_clothing_test"/>
-        <env name="DB_USERNAME" value="stive"/>
-        <env name="DB_PASSWORD" value="secret"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="STIVE_WHATSAPP_NUMBER" value="237600000000"/>
+
+        <!--
+          Base de données des tests
+
+          Seul le NOM de la base est forcé ici : il garantit que les tests
+          n'effacent jamais les données de développement (migrate:fresh).
+
+          L'hôte, le port et surtout l'utilisateur / mot de passe sont repris
+          du fichier .env de la machine (ou de .env.testing s'il existe) :
+          chaque poste garde ainsi ses propres identifiants MySQL.
+
+          La base doit porter un nom terminé par « _test » : c'est vérifié
+          avant toute migration par Tests\TestCase::beforeRefreshingDatabase().
+        -->
+        <env name="DB_DATABASE" value="stive_clothing_test"/>
     </php>
 </phpunit>
