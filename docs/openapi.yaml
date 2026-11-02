@@ -563,6 +563,8 @@ paths:
         content:
           application/json:
             schema: { $ref: '#/components/schemas/ProductWrite' }
+          multipart/form-data:
+            schema: { $ref: '#/components/schemas/ProductCreateWrite' }
       responses:
         '201':
           description: Modèle créé
@@ -989,6 +991,22 @@ components:
           type: array
           maxItems: 20
           items: { $ref: '#/components/schemas/MeasurementFieldWrite' }
+
+    ProductCreateWrite:
+      allOf:
+        - $ref: '#/components/schemas/ProductWrite'
+        - type: object
+          properties:
+            images:
+              type: array
+              maxItems: 10
+              description: Images JPG, PNG, WebP ou AVIF (4 Mo maximum chacune).
+              items: { type: string, format: binary }
+            image_alts:
+              type: array
+              maxItems: 10
+              description: Textes alternatifs dans le même ordre que images ; omis, le nom du modèle est utilisé.
+              items: { type: string, maxLength: 180 }
 
     ProductOptionWrite:
       type: object

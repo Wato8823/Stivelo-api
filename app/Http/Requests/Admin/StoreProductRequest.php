@@ -27,7 +27,7 @@ class StoreProductRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
+        $rules = [
             'category_id' => ['required', 'integer', 'exists:categories,id'],
             'name' => ['required', 'string', 'min:3', 'max:160'],
             'slug' => ['nullable', 'string', 'max:180', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $this->slugUniqueRule()],
@@ -66,6 +66,23 @@ class StoreProductRequest extends FormRequest
             'measurement_fields.*.min_cm' => ['nullable', 'integer', 'min:10', 'max:250'],
             'measurement_fields.*.max_cm' => ['nullable', 'integer', 'min:10', 'max:250', 'gte:measurement_fields.*.min_cm'],
         ];
+
+        // Le téléversement groupé est disponible lors de la création seulement ;
+        // les photos d'un modèle existant gardent leur endpoint dédié.
+        if (! ($this->route('product') instanceof Product)) {
+            $rules['images'] = ['sometimes', 'array', 'max:10'];
+            $rules['images.*'] = [
+                'required',
+                'file',
+                'image',
+                'mimes:'.implode(',', config('catalog.media.mimes', ['jpg', 'jpeg', 'png', 'webp'])),
+                'max:'.(int) config('catalog.media.max_kb', 4096),
+            ];
+            $rules['image_alts'] = ['sometimes', 'array', 'max:10'];
+            $rules['image_alts.*'] = ['nullable', 'string', 'max:180'];
+        }
+
+        return $rules;
     }
 
     /**
