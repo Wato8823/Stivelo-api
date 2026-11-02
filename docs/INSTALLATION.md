@@ -260,8 +260,9 @@ php artisan test
 | Base de développement | jamais touchée |
 
 Seul le nom de la base est forcé, et une garde dans `tests/TestCase.php`
-(`beforeRefreshingDatabase`) refuse de démarrer si le nom ne se termine pas par
-`_test` : `migrate:fresh` ne peut donc pas effacer vos données réelles.
+(`setUpTraits`, donc avant toute migration) refuse de démarrer si le nom ne se
+termine pas par `_test` : `migrate:fresh` ne peut pas effacer vos données
+réelles.
 
 ### Créer la base de test
 

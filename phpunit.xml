@@ -39,7 +39,7 @@
           chaque poste garde ainsi ses propres identifiants MySQL.
 
           La base doit porter un nom terminé par « _test » : c'est vérifié
-          avant toute migration par Tests\TestCase::beforeRefreshingDatabase().
+          avant toute migration par Tests\TestCase::setUpTraits().
         -->
         <env name="DB_DATABASE" value="stive_clothing_test"/>
     </php>

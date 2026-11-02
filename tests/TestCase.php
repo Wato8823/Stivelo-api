@@ -8,14 +8,23 @@ use RuntimeException;
 abstract class TestCase extends BaseTestCase
 {
     /**
-     * Garde-fou exécuté avant toute migration lancée par RefreshDatabase.
+     * Garde-fou exécuté avant que RefreshDatabase ne lance ses migrations
+     * (`migrate:fresh`). Si la connexion pointait par erreur vers la base de
+     * développement, toutes les données réelles seraient effacées : on refuse
+     * donc net toute base dont le nom ne se termine pas par « _test ».
      *
-     * Les tests utilisent `migrate:fresh` : si la connexion pointait par
-     * erreur vers la base de développement, toutes les données réelles
-     * seraient effacées. On refuse donc net toute base dont le nom ne se
-     * termine pas par « _test ».
+     * Le contrôle est placé ici plutôt que dans beforeRefreshingDatabase() :
+     * cette méthode appartient au trait RefreshDatabase, qui prendrait le
+     * dessus sur celle du parent dans les classes de test.
      */
-    protected function beforeRefreshingDatabase(): void
+    protected function setUpTraits()
+    {
+        $this->guardAgainstNonTestDatabase();
+
+        parent::setUpTraits();
+    }
+
+    protected function guardAgainstNonTestDatabase(): void
     {
         $connection = (string) config('database.default');
         $database = config("database.connections.{$connection}.database");
