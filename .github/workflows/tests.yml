@@ -53,6 +53,9 @@ jobs:
           cp .env.example .env
           php artisan key:generate
 
+      - name: Diagnostic de l'environnement
+        run: php artisan stive:check-setup
+
       - name: Style (Pint)
         run: vendor/bin/pint --test
         continue-on-error: true
