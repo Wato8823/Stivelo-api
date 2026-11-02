@@ -6,7 +6,7 @@ branche et se termine par des critères de recette vérifiables.
 
 Le cadrage fonctionnel de référence est le cahier des charges du projet
 (boutique de vêtements personnalisables, commande transmise par WhatsApp,
-devise FCFA, architecture Angular + Laravel + PostgreSQL).
+devise FCFA, architecture Angular + Laravel + MySQL).
 
 ---
 
@@ -15,13 +15,13 @@ devise FCFA, architecture Angular + Laravel + PostgreSQL).
 | Élément | Choix retenu |
 | --- | --- |
 | Framework API | Laravel 12 (PHP 8.2+) |
-| Base de données | PostgreSQL 16 |
+| Base de données | MySQL 8 (InnoDB, utf8mb4) |
 | Authentification admin | Laravel Sanctum (jetons Bearer, 8 h) |
 | Frontend cible | Angular (consomme `/api/v1`) |
 | Contrat d'interface | OpenAPI 3.1 — [`docs/openapi.yaml`](openapi.yaml) |
 | Canal de commande MVP | WhatsApp Click-to-Chat (aucun envoi automatique) |
 | Devise | FCFA (XAF), montants en entiers |
-| Tests | PHPUnit 11 + `RefreshDatabase` sur PostgreSQL |
+| Tests | PHPUnit 11 + `RefreshDatabase` sur MySQL |
 | Style | Laravel Pint |
 
 ### Cartographie de l'API
@@ -54,7 +54,7 @@ devise FCFA, architecture Angular + Laravel + PostgreSQL).
 
 ## Étape 1 — Cadrage technique et socle du projet
 
-**Commit** : `chore(bootstrap): squelette Laravel 12 + PostgreSQL, routing /api/v1 et configuration métier`
+**Commit** : `chore(bootstrap): squelette Laravel 12 + MySQL, routing /api/v1 et configuration métier`
 
 ### Objectifs
 
@@ -72,9 +72,9 @@ devise FCFA, architecture Angular + Laravel + PostgreSQL).
   contraintes médias. **Aucune de ces valeurs n'est codée en dur ailleurs.**
 - `config/sanctum.php` : expiration des jetons pilotée par `SANCTUM_EXPIRATION`
   (480 min par défaut).
-- `.env.example` : connexion PostgreSQL, WhatsApp, devise, disque médias, S3.
-- `docker-compose.yml` : PostgreSQL 16 prêt à l'emploi.
-- `phpunit.xml` : environnement de test (PostgreSQL dédié, cache array, clé fixe).
+- `.env.example` : connexion MySQL (utf8mb4), WhatsApp, devise, disque médias, S3.
+- `docker-compose.yml` : MySQL 8.4 prêt à l'emploi (base de test créée automatiquement).
+- `phpunit.xml` : environnement de test (base MySQL dédiée, cache array, clé fixe).
 - `GET /api/v1/health` : première route, utile aux sondes de disponibilité.
 
 ### Commandes
@@ -93,9 +93,9 @@ docker compose up -d db
 
 ---
 
-## Étape 2 — Modèle de données PostgreSQL
+## Étape 2 — Modèle de données MySQL
 
-**Commit** : `feat(database): schéma PostgreSQL (catalogue, options, mesures, commandes, journal) et énumérations métier`
+**Commit** : `feat(database): schéma MySQL (catalogue, options, mesures, commandes, journal) et énumérations métier`
 
 ### Objectifs
 
@@ -114,7 +114,7 @@ docker compose up -d db
 | `product_options` | couleurs / tissus / tailles | unicité `(product_id, type, value)`, `price_delta` |
 | `product_measurement_fields` | guide des mesures | `key`, `label`, `is_required`, bornes `min_cm`/`max_cm` |
 | `orders` | demandes | `reference` unique, consentement, `total_estimate`, IP hachée |
-| `order_items` | lignes | `product_snapshot` JSONB figé, `line_total` |
+| `order_items` | lignes | `product_snapshot` JSON figé, `line_total` |
 | `measurements` | mensurations | une valeur par mesure et par ligne |
 | `order_events` | journal | ancien/nouvel état, auteur, note |
 | `personal_access_tokens` | jetons Sanctum | fourni par le paquet |
@@ -126,7 +126,7 @@ docker compose up -d db
 
 ### Critères de recette
 
-- `php artisan migrate:fresh` s'exécute sans erreur sur PostgreSQL.
+- `php artisan migrate:fresh` s'exécute sans erreur sur MySQL 8.
 - Les index couvrent les filtres réels : `(status, created_at)`,
   `(category_id, status)`, `(product_id, type, is_active)`.
 - Aucun montant monétaire en flottant.
@@ -264,7 +264,7 @@ python3 tools/generate_demo_media.py   # regénère les visuels de démonstratio
      autorisé, mesures obligatoires présentes et dans les bornes du modèle,
      clés de mesures inconnues rejetées.
 - `OrderService` : transaction unique, **prix recalculé** (base + suppléments),
-  instantané JSONB, mesures, référence unique, événement initial, IP hachée
+  instantané JSON, mesures, référence unique, événement initial, IP hachée
   en HMAC (jamais stockée en clair), lien WhatsApp construit après commit.
 - `OrderMessageBuilder` : message français reprenant modèle, coloris, tissu,
   taille, mensurations, total indicatif, référence et coordonnées.
@@ -322,7 +322,7 @@ vendor/bin/pint --test           # style
 
 ### Critères de recette
 
-- Suite verte sur PostgreSQL (base `stive_clothing_test`).
+- Suite verte sur MySQL (base `stive_clothing_test`).
 - Aucun test ne dépend de l'ordre d'exécution (`RefreshDatabase`).
 - Les tests couvrent les critères de recette du cahier des charges (§11).
 
@@ -339,8 +339,7 @@ vendor/bin/pint --test           # style
 - `docs/DEVELOPPEMENT.md` : ce guide.
 - `README.md` : démarrage rapide, table des endpoints.
 - `GET /docs/openapi.yaml` : le contrat est servi par l'application.
-- CI GitHub Actions : PostgreSQL 16 en service, `composer validate`, Pint,
-  `php artisan test`.
+- CI GitHub Actions : MySQL 8.4 en service, Pint, `php artisan test`.
 
 ### Critères de recette
 
@@ -455,6 +454,6 @@ git log --oneline
 # feat(catalog): API publique catégories et produits, filtres paginés, cache versionné et configuration boutique
 # feat(auth): authentification Sanctum, rôles, policies, format d'erreur unique et limitation de débit
 # feat(models): modèles Eloquent, usines de données, catalogue de démonstration et visuels
-# feat(database): schéma PostgreSQL (catalogue, options, mesures, commandes, journal) et énumérations métier
-# chore(bootstrap): squelette Laravel 12 + PostgreSQL, routing /api/v1 et configuration métier
+# feat(database): schéma MySQL (catalogue, options, mesures, commandes, journal) et énumérations métier
+# chore(bootstrap): squelette Laravel 12 + MySQL, routing /api/v1 et configuration métier
 ```
