@@ -98,17 +98,32 @@ try {
     echo "Base « {$database} » prête (utf8mb4).\n";
 
     if ($owner !== null) {
+        $granted = [];
+
         foreach (['%', 'localhost'] as $hostPart) {
-            $pdo->exec(sprintf(
-                "GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'%s'",
-                $database,
-                $owner,
-                $hostPart,
-            ));
+            try {
+                $pdo->exec(sprintf(
+                    "GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'%s'",
+                    $database,
+                    $owner,
+                    $hostPart,
+                ));
+                $granted[] = $owner.'@'.$hostPart;
+            } catch (PDOException $exception) {
+                // 1410 : MySQL refuse de créer un compte via GRANT. Le compte
+                // existe peut-être déjà avec un autre hôte : on continue.
+                if (! str_contains($exception->getMessage(), '1410')) {
+                    throw $exception;
+                }
+            }
         }
 
-        $pdo->exec('FLUSH PRIVILEGES');
-        echo "Droits accordés à « {$owner} » sur « {$database} ».\n";
+        if ($granted !== []) {
+            $pdo->exec('FLUSH PRIVILEGES');
+            echo 'Droits accordés à « '.implode(' », « ', $granted).' » sur « '.$database." ».\n";
+        } else {
+            echo "Aucun compte « {$owner} » à mettre à jour : créez-le d'abord si nécessaire.\n";
+        }
     }
 } catch (PDOException $exception) {
     fwrite(STDERR, "Échec de la création : ".$exception->getMessage()."\n");
