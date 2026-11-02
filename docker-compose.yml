@@ -1,28 +1,36 @@
-# Environnement de développement local — PostgreSQL 16
+# Environnement de développement local — MySQL 8.4
 #
 #   docker compose up -d db
 #   php artisan migrate --seed
 #
 # Les identifiants correspondent au .env.example livré.
+# Base de test des tests automatisés : stive_clothing_test (créée ci-dessous).
 services:
   db:
-    image: postgres:16-alpine
+    image: mysql:8.4
     container_name: stive-db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: stive_clothing
-      POSTGRES_USER: stive
-      POSTGRES_PASSWORD: secret
-      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+      MYSQL_DATABASE: stive_clothing
+      MYSQL_USER: stive
+      MYSQL_PASSWORD: secret
+      MYSQL_ROOT_PASSWORD: root-secret
+      TZ: UTC
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+00:00
     ports:
-      - "5432:5432"
+      - "3306:3306"
     volumes:
-      - stive-pgdata:/var/lib/postgresql/data
+      - stive-mysqldata:/var/lib/mysql
+      # Crée la base utilisée par `php artisan test` au premier démarrage.
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U stive -d stive_clothing"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "stive", "-psecret"]
       interval: 5s
       timeout: 5s
       retries: 10
 
 volumes:
-  stive-pgdata:
+  stive-mysqldata:
