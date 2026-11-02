@@ -1,6 +1,9 @@
 <?php
 
 use App\Http\Controllers\Api\V1\Admin\AuthController;
+use App\Http\Controllers\Api\V1\CategoryController;
+use App\Http\Controllers\Api\V1\ProductController;
+use App\Http\Controllers\Api\V1\ShopController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -19,6 +22,18 @@ Route::get('/health', fn () => response()->json([
     'currency' => config('catalog.currency.code'),
     'time' => now()->toIso8601String(),
 ]))->name('api.health');
+
+/*
+|--------------------------------------------------------------------------
+| Boutique — public
+|--------------------------------------------------------------------------
+*/
+Route::get('/shop', [ShopController::class, 'show'])->name('api.shop.show');
+Route::get('/categories', [CategoryController::class, 'index'])->name('api.categories.index');
+Route::get('/products', [ProductController::class, 'index'])->name('api.products.index');
+Route::get('/products/{slug}', [ProductController::class, 'show'])
+    ->where('slug', '[a-z0-9\-]+')
+    ->name('api.products.show');
 
 /*
 |--------------------------------------------------------------------------
