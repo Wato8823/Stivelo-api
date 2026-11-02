@@ -47,6 +47,16 @@ return [
             'report' => false,
         ],
 
+        // Photos de démonstration livrées avec le dépôt (non utilisées en production).
+        'demo' => [
+            'driver' => 'local',
+            'root' => public_path('demo'),
+            'url' => env('APP_URL').'/demo',
+            'visibility' => 'public',
+            'throw' => false,
+            'report' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

@@ -15,6 +15,7 @@ return new class extends Migration
         Schema::create('product_media', function (Blueprint $table) {
             $table->id();
             $table->foreignId('product_id')->constrained()->cascadeOnDelete();
+            $table->string('disk', 20)->default('public'); // public, s3, demo…
             $table->string('storage_key'); // ex. products/42/photo-1.webp
             $table->string('alt', 180);
             $table->unsignedSmallInteger('sort_order')->default(0);
