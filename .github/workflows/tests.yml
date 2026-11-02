@@ -57,9 +57,12 @@ jobs:
       # développement pour valider migrations, seeders et diagnostic.
       - name: Préparer la base de développement
         run: |
-          # Pas de client mysql garanti sur le runner : on passe par PDO.
-          php -r '$c = new PDO("mysql:host=127.0.0.1;port=3306", "stive", "secret"); $c->exec("CREATE DATABASE IF NOT EXISTS stive_clothing CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");'
-          php artisan migrate --seed --force 2>&1 | tee -a /tmp/setup.log
+          set -o pipefail
+          {
+            # Pas de client mysql garanti sur le runner : on passe par PDO.
+            php -r '$c = new PDO("mysql:host=127.0.0.1;port=3306", "stive", "secret"); $c->exec("CREATE DATABASE IF NOT EXISTS stive_clothing CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");'
+            php artisan migrate --seed --force
+          } 2>&1 | tee -a /tmp/setup.log
 
       - name: Diagnostic de l'environnement
         run: php artisan stive:check-setup 2>&1 | tee /tmp/setup.log
