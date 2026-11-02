@@ -1,0 +1,28 @@
+# Environnement de développement local — PostgreSQL 16
+#
+#   docker compose up -d db
+#   php artisan migrate --seed
+#
+# Les identifiants correspondent au .env.example livré.
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: stive-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: stive_clothing
+      POSTGRES_USER: stive
+      POSTGRES_PASSWORD: secret
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports:
+      - "5432:5432"
+    volumes:
+      - stive-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stive -d stive_clothing"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  stive-pgdata:
