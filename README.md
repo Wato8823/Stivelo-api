@@ -16,13 +16,14 @@ cp .env.example .env && php artisan key:generate
 docker compose up -d db            # MySQL 8.4 (+ base de test)
 php artisan migrate --seed
 php artisan storage:link
+php artisan stive:check-setup      # vérifie PHP, .env, base de dev et base de test
 php artisan serve                  # http://localhost:8000
 ```
 
 ```bash
 curl http://localhost:8000/api/v1/health
 curl http://localhost:8000/api/v1/products
-php artisan test
+php artisan test                   # utilise stive_clothing_test, identifiants de .env
 ```
 
 Comptes de démonstration : `admin@stive-clothing.test`, `conseiller@stive-clothing.test`,

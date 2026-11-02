@@ -187,6 +187,18 @@ DB_COLLATION=utf8mb4_unicode_ci
 
 Après toute modification du `.env` : `php artisan config:clear`.
 
+### Séparer les identifiants de test (recommandé)
+
+Les tests tournent sur une base dédiée mais **avec les identifiants de votre
+`.env`**. Pour utiliser un utilisateur MySQL réservé aux tests :
+
+```bash
+cp .env.testing.example .env.testing   # puis adapter DB_USERNAME / DB_PASSWORD
+```
+
+`.env.testing` est prioritaire sur `.env` lorsque `APP_ENV=testing` et n'est
+jamais versionné.
+
 ### Données de démonstration créées par `--seed`
 
 - 7 catégories, 12 modèles (couleurs, tissus, tailles, guide des mesures) ;
@@ -239,15 +251,57 @@ curl -X PATCH http://localhost:8000/api/v1/admin/orders/1 \
 php artisan test
 ```
 
-Les tests utilisent la base **`stive_clothing_test`** (§ 3). Si elle manque :
+### Comment les tests choisissent leur base
+
+| Paramètre | Valeur |
+| --- | --- |
+| Nom de la base | **imposé par `phpunit.xml`** : `stive_clothing_test` |
+| Hôte, port, utilisateur, mot de passe | **repris de votre `.env`** (ou de `.env.testing` s'il existe) |
+| Base de développement | jamais touchée |
+
+Seul le nom de la base est forcé, et une garde dans `tests/TestCase.php`
+(`beforeRefreshingDatabase`) refuse de démarrer si le nom ne se termine pas par
+`_test` : `migrate:fresh` ne peut donc pas effacer vos données réelles.
+
+### Créer la base de test
 
 ```bash
+# MySQL local (l'utilisateur de votre .env doit avoir le droit de créer des bases)
 mysql -u root -p -e "CREATE DATABASE stive_clothing_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+mysql -u root -p -e "GRANT ALL PRIVILEGES ON stive_clothing_test.* TO 'votre_utilisateur'@'localhost'; FLUSH PRIVILEGES;"
 ```
 
-Sous Docker, elle est déjà créée. Résultat attendu : suite entièrement verte.
+Avec Docker, elle est créée automatiquement au premier démarrage
+(`docker/mysql/init/01-create-test-database.sql`).
 
----
+### Vérifier l'environnement avant de lancer les tests
+
+```bash
+php artisan stive:check-setup
+```
+
+La commande contrôle, dans l'ordre : version de PHP, extensions (`pdo_mysql`,
+`mbstring`, `openssl`…), `APP_KEY`, droits d'écriture (`storage/`,
+`bootstrap/cache/`), connexion à la base de développement, puis existence de la
+base de test. Chaque échec est accompagné de la commande exacte à exécuter —
+y compris les instructions `CREATE DATABASE` adaptées à votre utilisateur.
+
+Résultat attendu quand tout est en place :
+
+```
+[OK] Version de PHP           8.3.x (8.2 minimum)
+[OK] Extension pdo_mysql      chargée
+[OK] Connexion (mysql)        stive_clothing accessible
+[OK] Base « stive_clothing_test »   accessible avec l'utilisateur « root »
+Environnement prêt — 0 avertissement(s).
+```
+
+Enfin, la suite elle-même :
+
+```bash
+php artisan test                       # suite complète
+php artisan test --filter=OrderCreation # sous-ensemble
+```
 
 ## 8. Dépannage
 
@@ -255,8 +309,10 @@ Sous Docker, elle est déjà créée. Résultat attendu : suite entièrement ver
 | --- | --- |
 | `could not find driver` | extension `pdo_mysql` désactivée → § 2, puis rouvrir le terminal |
 | `SQLSTATE[HY000] [2002] Connection refused` | MySQL arrêté (`sudo service mysql start`, Laragon → Start, `docker compose up -d db`) |
-| `Access denied for user 'stive'` | utilisateur/base non créés → rejouer le SQL du § 3, vérifier `.env` |
-| `Unknown database 'stive_clothing'` | `php artisan migrate` lancé avant la création de la base |
+| `Access denied for user '…'` au démarrage | identifiants de `.env` incorrects → corriger `DB_USERNAME`/`DB_PASSWORD`, puis `php artisan config:clear` |
+| `Access denied` **uniquement** pendant `php artisan test` | l'utilisateur de test n'a pas accès à `stive_clothing_test` → § 7 (création + `GRANT`), ou renseigner `.env.testing` |
+| `Unknown database 'stive_clothing'` | `php artisan migrate` lancé avant la création de la base (§ 3) |
+| `Unknown database 'stive_clothing_test'` | base de test absente → § 7 ou `php artisan stive:check-setup` |
 | `Specified key was too long` | base créée sans `utf8mb4` → recréer avec `CHARACTER SET utf8mb4` |
 | `php`/`composer` non reconnu | `PATH` incomplet → rouvrir le terminal après modification |
 | `419`/`500` au premier lancement | `php artisan key:generate` oublié ou `.env` absent |
