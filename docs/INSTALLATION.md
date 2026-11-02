@@ -265,8 +265,23 @@ Seul le nom de la base est forcé, et une garde dans `tests/TestCase.php`
 
 ### Créer la base de test
 
+Sans client `mysql` installé (Windows, Laragon, XAMPP), utilisez l'outil fourni :
+
 ```bash
-# MySQL local (l'utilisateur de votre .env doit avoir le droit de créer des bases)
+php tools/create-database.php stive_clothing_test stive
+```
+
+Le premier argument est la base, le second l'utilisateur à qui en accorder
+l'accès (facultatif). La connexion administrateur se règle par variables
+d'environnement :
+
+```bash
+DB_ADMIN_PASSWORD=monmotdepasse php tools/create-database.php stive_clothing_test stive
+```
+
+Avec le client `mysql` :
+
+```bash
 mysql -u root -p -e "CREATE DATABASE stive_clothing_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 mysql -u root -p -e "GRANT ALL PRIVILEGES ON stive_clothing_test.* TO 'votre_utilisateur'@'localhost'; FLUSH PRIVILEGES;"
 ```

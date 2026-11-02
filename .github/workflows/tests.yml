@@ -53,14 +53,16 @@ jobs:
           cp .env.example .env
           php artisan key:generate
 
-      # La CI ne dispose que de la base de test : on prépare la base de
-      # développement pour valider migrations, seeders et diagnostic.
+      # La CI ne dispose que de la base de test : on crée la base de
+      # développement (droits admin requis), puis on valide migrations et seeders.
       - name: Préparer la base de développement
+        env:
+          DB_ADMIN_USER: root
+          DB_ADMIN_PASSWORD: root-secret
         run: |
           set -o pipefail
           {
-            # Pas de client mysql garanti sur le runner : on passe par PDO.
-            php -r '$c = new PDO("mysql:host=127.0.0.1;port=3306", "stive", "secret"); $c->exec("CREATE DATABASE IF NOT EXISTS stive_clothing CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");'
+            php tools/create-database.php stive_clothing stive
             php artisan migrate --seed --force
           } 2>&1 | tee -a /tmp/setup.log
 
