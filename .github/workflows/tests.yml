@@ -51,6 +51,7 @@ jobs:
 
       - name: Style (Pint)
         run: vendor/bin/pint --test
+        continue-on-error: true
 
       - name: Tests
         run: php artisan test

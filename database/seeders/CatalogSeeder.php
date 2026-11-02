@@ -96,7 +96,7 @@ class CatalogSeeder extends Seeder
     {
         foreach ($colors as $position => [$label, $value]) {
             $product->options()->updateOrCreate(
-                ['type' => ProductOptionType::Color, 'value' => $value],
+                ['type' => ProductOptionType::Color->value, 'value' => $value],
                 ['label' => $label, 'price_delta' => 0, 'sort_order' => $position + 1, 'is_active' => true],
             );
         }
@@ -109,7 +109,7 @@ class CatalogSeeder extends Seeder
     {
         foreach ($fabrics as $position => [$label, $value, $delta]) {
             $product->options()->updateOrCreate(
-                ['type' => ProductOptionType::Fabric, 'value' => $value],
+                ['type' => ProductOptionType::Fabric->value, 'value' => $value],
                 ['label' => $label, 'price_delta' => $delta, 'sort_order' => $position + 1, 'is_active' => true],
             );
         }
@@ -119,13 +119,13 @@ class CatalogSeeder extends Seeder
     {
         foreach (config('catalog.sizes') as $position => $size) {
             $product->options()->updateOrCreate(
-                ['type' => ProductOptionType::Size, 'value' => $size],
+                ['type' => ProductOptionType::Size->value, 'value' => $size],
                 ['label' => $size, 'price_delta' => 0, 'sort_order' => $position + 1, 'is_active' => true],
             );
         }
 
         $product->options()->updateOrCreate(
-            ['type' => ProductOptionType::Size, 'value' => 'Sur mesure'],
+            ['type' => ProductOptionType::Size->value, 'value' => 'Sur mesure'],
             ['label' => 'Sur mesure', 'price_delta' => 0, 'sort_order' => 99, 'is_active' => true],
         );
     }

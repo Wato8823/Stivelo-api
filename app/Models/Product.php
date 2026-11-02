@@ -123,8 +123,7 @@ class Product extends Model
     public function optionValues(ProductOptionType $type): array
     {
         return $this->options
-            ->where('type', $type)
-            ->where('is_active', true)
+            ->filter(fn ($option) => $option->type === $type && $option->is_active)
             ->pluck('value')
             ->all();
     }

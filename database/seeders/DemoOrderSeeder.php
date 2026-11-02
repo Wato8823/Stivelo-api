@@ -83,10 +83,12 @@ class DemoOrderSeeder extends Seeder
                     'channel' => 'whatsapp',
                     'consent_given' => true,
                     'confirmed_at' => $sample['status'] === OrderStatus::PendingConfirmation ? null : now()->subDays($sample['age_days'])->addHours(3),
-                    'created_at' => now()->subDays($sample['age_days']),
-                    'updated_at' => now(),
                 ],
             );
+
+            // La date de création est forcée pour que la démonstration couvre
+            // plusieurs jours d'activité (created_at n'est pas assignable en masse).
+            $order->forceFill(['created_at' => now()->subDays($sample['age_days'])])->saveQuietly();
 
             $item = OrderItem::query()->updateOrCreate(
                 ['order_id' => $order->id, 'product_id' => $product->id],

@@ -59,7 +59,7 @@ class ProductAdminResource extends JsonResource
         }
 
         return $this->options
-            ->where('type', $type)
+            ->filter(fn ($option) => $option->type === $type)
             ->map(fn ($option) => [
                 'id' => $option->id,
                 'label' => $option->label,

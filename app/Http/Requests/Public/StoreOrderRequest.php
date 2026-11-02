@@ -118,11 +118,9 @@ class StoreOrderRequest extends FormRequest
      */
     private function validateOptions(Validator $validator, int $index, Product $product, array $item): void
     {
-        $color = $product->options
-            ->where('type', ProductOptionType::Color)
-            ->where('value', $item['color'])
-            ->where('is_active', true)
-            ->first();
+        $color = $product->options->first(fn ($option) => $option->type === ProductOptionType::Color
+            && $option->value === $item['color']
+            && $option->is_active);
 
         if ($color === null) {
             $validator->errors()->add(
@@ -131,11 +129,9 @@ class StoreOrderRequest extends FormRequest
             );
         }
 
-        $fabric = $product->options
-            ->where('type', ProductOptionType::Fabric)
-            ->where('value', $item['fabric'])
-            ->where('is_active', true)
-            ->first();
+        $fabric = $product->options->first(fn ($option) => $option->type === ProductOptionType::Fabric
+            && $option->value === $item['fabric']
+            && $option->is_active);
 
         if ($fabric === null) {
             $validator->errors()->add(
@@ -156,11 +152,9 @@ class StoreOrderRequest extends FormRequest
         }
 
         if (! $isCustom) {
-            $size = $product->options
-                ->where('type', ProductOptionType::Size)
-                ->where('value', $item['size'])
-                ->where('is_active', true)
-                ->first();
+            $size = $product->options->first(fn ($option) => $option->type === ProductOptionType::Size
+                && $option->value === $item['size']
+                && $option->is_active);
 
             if ($size === null) {
                 $validator->errors()->add(

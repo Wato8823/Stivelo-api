@@ -39,14 +39,23 @@ class ProductResource extends JsonResource
             'category' => new CategoryResource($this->whenLoaded('category')),
             'media' => ProductMediaResource::collection($this->whenLoaded('media')),
             'options' => [
-                'colors' => ProductOptionResource::collection($options->where('type', ProductOptionType::Color)->values()),
-                'fabrics' => ProductOptionResource::collection($options->where('type', ProductOptionType::Fabric)->values()),
-                'sizes' => ProductOptionResource::collection($options->where('type', ProductOptionType::Size)->values()),
+                'colors' => ProductOptionResource::collection($this->optionsOfType($options, ProductOptionType::Color)),
+                'fabrics' => ProductOptionResource::collection($this->optionsOfType($options, ProductOptionType::Fabric)),
+                'sizes' => ProductOptionResource::collection($this->optionsOfType($options, ProductOptionType::Size)),
             ],
             'measurement_guide' => MeasurementFieldResource::collection($this->whenLoaded('measurementFields')),
             'whatsapp_url' => $this->whatsAppUrl(),
             'published_at' => $this->published_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, \App\Models\ProductOption>  $options
+     * @return \Illuminate\Support\Collection<int, \App\Models\ProductOption>
+     */
+    private function optionsOfType($options, ProductOptionType $type)
+    {
+        return $options->filter(fn ($option) => $option->type === $type)->values();
     }
 
     private function whatsAppUrl(): string
