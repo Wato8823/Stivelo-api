@@ -45,6 +45,19 @@ class Order extends Model
     /**
      * @return array<string, string>
      */
+    protected static function booted(): void
+    {
+        static::creating(function (Order $order) {
+            if (empty($order->reference)) {
+                do {
+                    $reference = static::newReference();
+                } while (static::where('reference', $reference)->exists());
+
+                $order->reference = $reference;
+            }
+        });
+    }
+
     protected function casts(): array
     {
         return [
