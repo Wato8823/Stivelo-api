@@ -70,12 +70,23 @@ class DemoOrderSeeder extends Seeder
         foreach ($samples as $sample) {
             $product = $products[$sample['product']] ?? $products->first();
             $fabricDelta = (int) $product->options
-                ->firstWhere(fn ($option) => $option->value === $sample['fabric'])?->price_delta;
+                ->first(fn ($option) => $option->value === $sample['fabric'])?->price_delta;
             $unitPrice = $product->base_price + $fabricDelta;
 
-            $order = Order::query()->updateOrCreate(
-                ['customer_phone' => $sample['customer_phone'], 'customer_name' => $sample['customer_name']],
+            $order = Order::query()->firstOrNew([
+                'customer_phone' => $sample['customer_phone'],
+                'customer_name' => $sample['customer_name'],
+            ]);
+
+            // La référence n'est générée qu'à la création : un nouveau passage
+            // du seeder ne doit pas réécrire l'historique existant.
+            if (! $order->exists) {
+                $order->reference = Order::newReference();
+            }
+
+            $order->fill(
                 [
+                    'reference' => $order->reference,
                     'status' => $sample['status'],
                     'total_estimate' => $unitPrice,
                     'customer_city' => $sample['customer_city'],
@@ -84,7 +95,7 @@ class DemoOrderSeeder extends Seeder
                     'consent_given' => true,
                     'confirmed_at' => $sample['status'] === OrderStatus::PendingConfirmation ? null : now()->subDays($sample['age_days'])->addHours(3),
                 ],
-            );
+            )->save();
 
             // La date de création est forcée pour que la démonstration couvre
             // plusieurs jours d'activité (created_at n'est pas assignable en masse).
