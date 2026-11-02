@@ -53,8 +53,16 @@ jobs:
           cp .env.example .env
           php artisan key:generate
 
+      # La CI ne dispose que de la base de test : on prépare la base de
+      # développement pour valider migrations, seeders et diagnostic.
+      - name: Préparer la base de développement
+        run: |
+          mysql -h 127.0.0.1 -ustive -psecret -e \
+            "CREATE DATABASE IF NOT EXISTS stive_clothing CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+          php artisan migrate --seed --force
+
       - name: Diagnostic de l'environnement
-        run: php artisan stive:check-setup
+        run: php artisan stive:check-setup 2>&1 | tee /tmp/setup.log
 
       - name: Style (Pint)
         run: vendor/bin/pint --test
@@ -76,9 +84,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           {
-            echo "### Échec des tests — extrait du journal"
+            echo "### Échec de la CI — extrait des journaux"
             echo '```'
-            tail -c 6000 /tmp/tests.log 2>/dev/null || echo "(journal indisponible)"
+            echo "--- diagnostic ---"
+            tail -c 3000 /tmp/setup.log 2>/dev/null || echo "(aucun journal de diagnostic)"
+            echo "--- tests ---"
+            tail -c 4000 /tmp/tests.log 2>/dev/null || echo "(aucun journal de tests)"
             echo '```'
           } > /tmp/comment.md
           gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/comments" \
