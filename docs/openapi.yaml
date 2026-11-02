@@ -1,0 +1,1188 @@
+openapi: 3.1.0
+info:
+  title: Stive Clothing — API
+  version: 1.0.0
+  description: |
+    API REST de la boutique Stive Clothing : catalogue de vêtements
+    personnalisables, prise de mesures sur mesure, création d'une demande
+    de commande transmise par WhatsApp, et administration sécurisée.
+
+    ## Conventions
+    - Toutes les routes sont préfixées par `/api/v1`.
+    - Les montants sont des **entiers en FCFA** (XAF), sans décimales.
+    - Les dates sont en **ISO 8601 / UTC**.
+    - Toute erreur suit le format unique décrit dans `Error`.
+
+    ## Authentification de l'administration
+    `POST /api/v1/admin/login` renvoie un jeton Bearer (Sanctum, durée de vie
+    8 h par défaut) à envoyer dans l'en-tête `Authorization`.
+servers:
+  - url: http://localhost:8000
+    description: Développement local
+  - url: https://api.stive-clothing.example
+    description: Production (exemple)
+
+tags:
+  - name: Boutique
+    description: Endpoints publics consommés par l'application Angular.
+  - name: Commandes
+    description: Création d'une demande et suivi interne.
+  - name: Administration
+    description: Authentification et gestion du catalogue.
+
+paths:
+  /api/v1/health:
+    get:
+      tags: [Boutique]
+      summary: État du service
+      responses:
+        '200':
+          description: Service disponible
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  service: { type: string }
+                  version: { type: string, example: 1.0.0 }
+                  currency: { type: string, example: XAF }
+                  time: { type: string, format: date-time }
+
+  /api/v1/shop:
+    get:
+      tags: [Boutique]
+      summary: Configuration publique de la boutique
+      description: |
+        Numéro WhatsApp professionnel, message par défaut, devise, tailles,
+        bornes de mesures et libellés des états de commande. Permet à
+        Angular de n'avoir aucune valeur métier codée en dur.
+      responses:
+        '200':
+          description: Configuration
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      name: { type: string, example: Stive Clothing }
+                      tagline: { type: string }
+                      whatsapp:
+                        type: object
+                        properties:
+                          number: { type: string, example: '237600000000' }
+                          default_message: { type: string }
+                          chat_url: { type: string, format: uri }
+                      currency:
+                        type: object
+                        properties:
+                          code: { type: string, example: XAF }
+                          label: { type: string, example: FCFA }
+                          decimals: { type: integer, example: 0 }
+                      sizes:
+                        type: array
+                        items: { type: string }
+                        example: [S, M, L, XL, XXL]
+                      custom_size_label: { type: string, example: Sur mesure }
+                      measurements:
+                        type: object
+                        properties:
+                          unit: { type: string, example: cm }
+                          min: { type: integer, example: 20 }
+                          max: { type: integer, example: 250 }
+                      order_statuses:
+                        type: object
+                        additionalProperties: { type: string }
+                      measurement_retention_days: { type: integer, example: 365 }
+                      endpoints:
+                        type: object
+                        properties:
+                          categories: { type: string, format: uri }
+                          products: { type: string, format: uri }
+                          orders: { type: string, format: uri }
+
+  /api/v1/categories:
+    get:
+      tags: [Boutique]
+      summary: Catégories publiées
+      responses:
+        '200':
+          description: Liste ordonnée des familles de produits
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Category' }
+                  meta:
+                    type: object
+                    properties:
+                      count: { type: integer }
+                      currency: { type: string }
+
+  /api/v1/products:
+    get:
+      tags: [Boutique]
+      summary: Catalogue filtré et paginé
+      parameters:
+        - $ref: '#/components/parameters/CategorySlug'
+        - name: q
+          in: query
+          description: Recherche sur le nom et les descriptions.
+          schema: { type: string, maxLength: 120 }
+        - name: min_price
+          in: query
+          description: Prix minimum, entier en FCFA.
+          schema: { type: integer, minimum: 0 }
+        - name: max_price
+          in: query
+          description: Prix maximum, entier en FCFA (doit être ≥ min_price).
+          schema: { type: integer, minimum: 0 }
+        - name: featured
+          in: query
+          description: Ne garder que les pièces mises en avant.
+          schema: { type: boolean }
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [newest, price_asc, price_desc, name]
+            default: newest
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: per_page
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 48, default: 12 }
+      responses:
+        '200':
+          description: Page de catalogue
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/ProductSummary' }
+                  meta:
+                    type: object
+                    properties:
+                      current_page: { type: integer }
+                      per_page: { type: integer }
+                      last_page: { type: integer }
+                      total: { type: integer }
+                      currency: { type: string }
+                      sort: { type: string }
+                  links:
+                    type: object
+                    properties:
+                      first: { type: string, nullable: true }
+                      prev: { type: string, nullable: true }
+                      next: { type: string, nullable: true }
+                      last: { type: string, nullable: true }
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/products/{slug}:
+    get:
+      tags: [Boutique]
+      summary: Fiche produit complète
+      description: |
+        Renvoie la galerie, les variantes actives (couleurs, tissus, tailles),
+        le guide des mesures du modèle et un lien WhatsApp prérempli pour
+        poser une question avant commande.
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Fiche produit
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/ProductDetail' }
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/orders:
+    post:
+      tags: [Commandes]
+      summary: Créer une demande de commande
+      description: |
+        Enregistre la demande, calcule le prix côté serveur, fige un instantané
+        des options et renvoie la référence publique ainsi qu'un lien WhatsApp
+        prérempli. **Aucun message n'est envoyé par le serveur** : le client
+        vérifie puis envoie lui-même le message.
+
+        Limitation de débit : 5 demandes par minute et par adresse IP.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OrderRequest' }
+            example:
+              customer:
+                name: Awa Ngo Bassong
+                phone: '+237 690 11 22 33'
+                city: Douala
+                note: Livraison avant le 10 décembre.
+              consent: true
+              items:
+                - product_id: 1
+                  color: noir
+                  fabric: laine-froide
+                  size: Sur mesure
+                  quantity: 1
+                  measurements:
+                    chest_cm: 98
+                    waist_cm: 84
+      responses:
+        '201':
+          description: Demande enregistrée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/OrderCreated' }
+                  message: { type: string }
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /api/v1/admin/login:
+    post:
+      tags: [Administration]
+      summary: Connexion d'un compte interne
+      description: |
+        Renvoie un jeton Bearer Sanctum valable 8 h par défaut.
+        Limitation de débit : 5 tentatives par minute et par e-mail/IP.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+                device_name:
+                  type: string
+                  maxLength: 60
+                  description: Nom lisible de l'appareil connecté.
+      responses:
+        '200':
+          description: Connexion réussie
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string }
+                  token_type: { type: string, example: Bearer }
+                  expires_at: { type: string, format: date-time }
+                  user: { $ref: '#/components/schemas/AdminUser' }
+        '401':
+          description: Identifiants incorrects
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example:
+                message: Identifiants incorrects.
+                code: invalid_credentials
+                errors: { email: [L'adresse e-mail ou le mot de passe est incorrect.] }
+                request_id: 0f6f1a4e-8d6f-4f0e-9f0b-6f6c8f0c1b2a
+        '403':
+          description: Compte désactivé
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /api/v1/admin/me:
+    get:
+      tags: [Administration]
+      summary: Profil et droits du compte connecté
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Profil
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/AdminUser' }
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+
+  /api/v1/admin/logout:
+    post:
+      tags: [Administration]
+      summary: Révoquer le jeton courant
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Déconnexion effectuée
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+
+  /api/v1/admin/stats:
+    get:
+      tags: [Administration]
+      summary: Tableau de bord
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Agrégats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      orders:
+                        type: object
+                        properties:
+                          total: { type: integer }
+                          by_status:
+                            type: object
+                            additionalProperties: { type: integer }
+                          pending: { type: integer }
+                          created_today: { type: integer }
+                          created_last_7_days: { type: integer }
+                          revenue_estimate: { type: integer }
+                          revenue_label: { type: string }
+                      catalogue:
+                        type: object
+                        properties:
+                          products_published: { type: integer }
+                          products_draft: { type: integer }
+                          categories_active: { type: integer }
+
+  /api/v1/admin/orders:
+    get:
+      tags: [Commandes]
+      summary: Lister les demandes
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending_confirmation, confirmed, in_production, ready, delivered, cancelled]
+        - name: q
+          in: query
+          description: Recherche sur la référence, le nom ou le téléphone.
+          schema: { type: string, maxLength: 120 }
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: per_page
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: Liste paginée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/OrderListItem' }
+                  meta:
+                    type: object
+                    properties:
+                      current_page: { type: integer }
+                      per_page: { type: integer }
+                      last_page: { type: integer }
+                      total: { type: integer }
+                      counts_by_status:
+                        type: object
+                        additionalProperties: { type: integer }
+                  links:
+                    type: object
+                    properties:
+                      prev: { type: string, nullable: true }
+                      next: { type: string, nullable: true }
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/admin/orders/{order}:
+    get:
+      tags: [Commandes]
+      summary: Consulter un dossier
+      description: |
+        Les mensurations ne sont renvoyées que si le rôle du compte y est
+        habilité (`admin`, `advisor`, `atelier`).
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: order
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Dossier
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/OrderDetail' }
+                  whatsapp_url: { type: string, format: uri }
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Commandes]
+      summary: Changer l'état d'une demande
+      description: |
+        Transitions autorisées (aucune étape ne peut être sautée) :
+        `pending_confirmation → confirmed | cancelled`,
+        `confirmed → in_production | cancelled`,
+        `in_production → ready | cancelled`,
+        `ready → delivered`.
+        Rôles : `admin`, `advisor`.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: order
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [confirmed, in_production, ready, delivered, cancelled]
+                note:
+                  type: string
+                  maxLength: 500
+                  description: Note interne conservée dans le journal.
+      responses:
+        '200':
+          description: État mis à jour
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/OrderDetail' }
+                  message: { type: string }
+        '409':
+          description: Transition interdite ou état inchangé
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example:
+                message: "Transition impossible de « En attente de confirmation » vers « Livrée ». États autorisés : Confirmée, Annulée."
+                code: invalid_status_transition
+                request_id: 6f1c2a44-1e5a-4a6c-9e0a-0c1b2a3d4e5f
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/admin/products:
+    get:
+      tags: [Administration]
+      summary: Catalogue administrable
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [draft, published, archived] }
+        - $ref: '#/components/parameters/CategorySlug'
+        - name: q
+          in: query
+          schema: { type: string, maxLength: 120 }
+        - name: trashed
+          in: query
+          description: Modèles archivés uniquement.
+          schema: { type: boolean }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: per_page
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: Liste
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/AdminProduct' }
+                  meta:
+                    type: object
+                    properties:
+                      current_page: { type: integer }
+                      per_page: { type: integer }
+                      last_page: { type: integer }
+                      total: { type: integer }
+    post:
+      tags: [Administration]
+      summary: Créer un modèle
+      description: Rôle `admin` requis. Le slug est généré et rendu unique si omis.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProductWrite' }
+      responses:
+        '201':
+          description: Modèle créé
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/AdminProduct' }
+                  message: { type: string }
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/admin/products/{product}:
+    put:
+      tags: [Administration]
+      summary: Mettre à jour un modèle
+      description: |
+        Les options envoyées remplacent la configuration : celles qui
+        disparaissent sont **désactivées** (jamais supprimées) pour préserver
+        l'historique des demandes.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProductWrite' }
+      responses:
+        '200':
+          description: Modèle mis à jour
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [Administration]
+      summary: Archiver un modèle
+      description: Suppression logique ; le modèle disparaît du catalogue public.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      responses:
+        '200':
+          description: Modèle archivé
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/admin/products/{product}/media:
+    post:
+      tags: [Administration]
+      summary: Téléverser une photo
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image, alt]
+              properties:
+                image:
+                  type: string
+                  format: binary
+                  description: JPG, PNG, WebP ou AVIF — 4 Mo maximum.
+                alt:
+                  type: string
+                  maxLength: 180
+                  description: Texte alternatif (accessibilité) — obligatoire.
+                sort_order:
+                  type: integer
+                  minimum: 0
+                  maximum: 99
+      responses:
+        '201':
+          description: Photo ajoutée
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/admin/products/{product}/media/{media}:
+    delete:
+      tags: [Administration]
+      summary: Supprimer une photo
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+        - name: media
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Photo supprimée
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/admin/categories:
+    get:
+      tags: [Administration]
+      summary: Catégories administrables
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Liste complète
+    post:
+      tags: [Administration]
+      summary: Créer une catégorie
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CategoryWrite' }
+      responses:
+        '201':
+          description: Catégorie créée
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/admin/categories/{category}:
+    put:
+      tags: [Administration]
+      summary: Mettre à jour une catégorie
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: category
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CategoryWrite' }
+      responses:
+        '200':
+          description: Catégorie mise à jour
+    delete:
+      tags: [Administration]
+      summary: Supprimer une catégorie
+      description: Refusé tant que des modèles (même archivés) y sont rattachés.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: category
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Catégorie supprimée
+        '409':
+          description: Catégorie non vide
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Sanctum
+
+  parameters:
+    CategorySlug:
+      name: category
+      in: query
+      description: Slug de la catégorie.
+      schema: { type: string }
+    ProductId:
+      name: product
+      in: path
+      required: true
+      schema: { type: integer }
+
+  responses:
+    ValidationError:
+      description: Données invalides
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example:
+            message: Les données envoyées sont invalides.
+            code: validation_failed
+            errors:
+              items.0.measurements.chest_cm:
+                - La mesure « Tour de poitrine » est obligatoire pour le sur-mesure.
+            request_id: 5b1c2e7a-2b8c-4d0e-9a6a-3f9b2c1d0e4f
+    NotFound:
+      description: Ressource introuvable
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example:
+            message: La ressource demandée est introuvable.
+            code: not_found
+            request_id: 1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f
+    Unauthenticated:
+      description: Jeton absent ou expiré
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example:
+            message: Authentification requise.
+            code: unauthenticated
+            request_id: 2d3e4f5a-6b7c-4d8e-9f0a-1b2c3d4e5f6a
+    Forbidden:
+      description: Droits insuffisants
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example:
+            message: Vous n’avez pas les droits nécessaires pour cette action.
+            code: forbidden
+            request_id: 3e4f5a6b-7c8d-4e9f-8a1b-2c3d4e5f6a7b
+    TooManyRequests:
+      description: Trop de requêtes
+      headers:
+        Retry-After:
+          schema: { type: integer }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example:
+            message: "Trop de demandes envoyées depuis cette connexion. Merci de patienter une minute."
+            code: too_many_requests
+            request_id: 4f5a6b7c-8d9e-4f0a-9b1c-3d4e5f6a7b8c
+
+  schemas:
+    Error:
+      type: object
+      required: [message, code]
+      properties:
+        message:
+          type: string
+          description: Message lisible par l'utilisateur, en français.
+        code:
+          type: string
+          enum:
+            - validation_failed
+            - unauthenticated
+            - invalid_credentials
+            - account_disabled
+            - forbidden
+            - not_found
+            - method_not_allowed
+            - conflict
+            - status_unchanged
+            - invalid_status_transition
+            - category_not_empty
+            - too_many_requests
+            - server_error
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items: { type: string }
+        request_id:
+          type: string
+          nullable: true
+          description: Identifiant de corrélation également renvoyé dans l'en-tête X-Request-Id.
+
+    Category:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string, example: 'Costume et veste' }
+        slug: { type: string, example: costume-veste }
+        description: { type: string, nullable: true }
+        sort_order: { type: integer }
+        is_active: { type: boolean }
+        products_count: { type: integer }
+
+    CategoryWrite:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, maxLength: 120 }
+        slug:
+          type: string
+          nullable: true
+          pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+        description: { type: string, nullable: true, maxLength: 500 }
+        sort_order: { type: integer, minimum: 0, maximum: 999 }
+        is_active: { type: boolean, default: true }
+
+    ProductMedia:
+      type: object
+      properties:
+        id: { type: integer }
+        url: { type: string, format: uri }
+        alt: { type: string }
+        sort_order: { type: integer }
+        width: { type: integer, nullable: true }
+        height: { type: integer, nullable: true }
+
+    ProductOption:
+      type: object
+      properties:
+        id: { type: integer }
+        type: { type: string, enum: [color, fabric, size] }
+        label: { type: string, example: 'Bleu nuit' }
+        value: { type: string, example: bleu-nuit }
+        price_delta: { type: integer, example: 15000 }
+        price_delta_label: { type: string, nullable: true, example: '+15 000 FCFA' }
+
+    MeasurementField:
+      type: object
+      properties:
+        key: { type: string, example: chest_cm }
+        label: { type: string, example: 'Tour de poitrine' }
+        hint: { type: string, nullable: true }
+        required: { type: boolean }
+        min_cm: { type: integer, example: 20 }
+        max_cm: { type: integer, example: 250 }
+        unit: { type: string, example: cm }
+
+    ProductSummary:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        slug: { type: string }
+        short_description: { type: string, nullable: true }
+        collection_badge: { type: string, nullable: true }
+        base_price: { type: integer, example: 145000 }
+        price_label: { type: string, example: '145 000 FCFA' }
+        is_featured: { type: boolean }
+        custom_size_enabled: { type: boolean }
+        category: { $ref: '#/components/schemas/Category' }
+        thumbnail: { $ref: '#/components/schemas/ProductMedia' }
+        published_at: { type: string, format: date-time, nullable: true }
+
+    ProductDetail:
+      allOf:
+        - $ref: '#/components/schemas/ProductSummary'
+        - type: object
+          properties:
+            description: { type: string, nullable: true }
+            currency: { type: string, example: XAF }
+            media:
+              type: array
+              items: { $ref: '#/components/schemas/ProductMedia' }
+            options:
+              type: object
+              properties:
+                colors:
+                  type: array
+                  items: { $ref: '#/components/schemas/ProductOption' }
+                fabrics:
+                  type: array
+                  items: { $ref: '#/components/schemas/ProductOption' }
+                sizes:
+                  type: array
+                  items: { $ref: '#/components/schemas/ProductOption' }
+            measurement_guide:
+              type: array
+              items: { $ref: '#/components/schemas/MeasurementField' }
+            whatsapp_url:
+              type: string
+              format: uri
+              description: Lien Click-to-Chat prérempli pour poser une question.
+
+    AdminProduct:
+      allOf:
+        - $ref: '#/components/schemas/ProductDetail'
+        - type: object
+          properties:
+            status: { type: string, enum: [draft, published, archived] }
+            status_label: { type: string }
+            sort_order: { type: integer }
+            colors:
+              type: array
+              items: { $ref: '#/components/schemas/ProductOption' }
+            fabrics:
+              type: array
+              items: { $ref: '#/components/schemas/ProductOption' }
+            sizes:
+              type: array
+              items: { $ref: '#/components/schemas/ProductOption' }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
+            deleted_at: { type: string, format: date-time, nullable: true }
+
+    ProductWrite:
+      type: object
+      required: [category_id, name, base_price, status]
+      properties:
+        category_id: { type: integer }
+        name: { type: string, minLength: 3, maxLength: 160 }
+        slug:
+          type: string
+          nullable: true
+          pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+        short_description: { type: string, nullable: true, maxLength: 300 }
+        description: { type: string, nullable: true, maxLength: 5000 }
+        collection_badge: { type: string, nullable: true, maxLength: 60 }
+        base_price:
+          type: integer
+          minimum: 0
+          description: Entier en FCFA, sans centimes.
+        status: { type: string, enum: [draft, published, archived] }
+        is_featured: { type: boolean }
+        custom_size_enabled: { type: boolean }
+        sort_order: { type: integer }
+        colors:
+          type: array
+          maxItems: 30
+          items: { $ref: '#/components/schemas/ProductOptionWrite' }
+        fabrics:
+          type: array
+          maxItems: 30
+          items: { $ref: '#/components/schemas/ProductOptionWrite' }
+        sizes:
+          type: array
+          maxItems: 15
+          items: { $ref: '#/components/schemas/ProductOptionWrite' }
+        measurement_fields:
+          type: array
+          maxItems: 20
+          items: { $ref: '#/components/schemas/MeasurementFieldWrite' }
+
+    ProductOptionWrite:
+      type: object
+      required: [label, value]
+      properties:
+        label: { type: string, maxLength: 120 }
+        value: { type: string, maxLength: 120, example: bleu-nuit }
+        price_delta: { type: integer, example: 15000 }
+        is_active: { type: boolean, default: true }
+
+    MeasurementFieldWrite:
+      type: object
+      required: [key, label]
+      properties:
+        key: { type: string, pattern: '^[a-z0-9_]+$', example: chest_cm }
+        label: { type: string, maxLength: 120 }
+        hint: { type: string, nullable: true, maxLength: 240 }
+        required: { type: boolean, default: true }
+        min_cm: { type: integer, default: 20 }
+        max_cm: { type: integer, default: 250 }
+
+    AdminUser:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        email: { type: string, format: email }
+        role: { type: string, enum: [admin, advisor, atelier] }
+        role_label: { type: string }
+        permissions:
+          type: object
+          properties:
+            manage_catalogue: { type: boolean }
+            update_orders: { type: boolean }
+            view_measurements: { type: boolean }
+
+    OrderRequest:
+      type: object
+      required: [customer, consent, items]
+      properties:
+        customer:
+          type: object
+          required: [name, phone]
+          properties:
+            name: { type: string, minLength: 2, maxLength: 120 }
+            phone:
+              type: string
+              pattern: '^\+?[0-9\s.\-()]{8,20}$'
+              example: '+237 690 11 22 33'
+            email: { type: string, format: email, nullable: true }
+            city: { type: string, nullable: true, maxLength: 120 }
+            note: { type: string, nullable: true, maxLength: 1000 }
+        consent:
+          type: boolean
+          description: Acceptation de l'usage des coordonnées et mensurations. Doit valoir true.
+        items:
+          type: array
+          minItems: 1
+          maxItems: 5
+          items:
+            type: object
+            required: [product_id, color, fabric, size]
+            properties:
+              product_id: { type: integer }
+              color:
+                type: string
+                description: Valeur technique d'une couleur active du modèle.
+                example: noir
+              fabric:
+                type: string
+                description: Valeur technique d'un tissu actif du modèle.
+                example: laine-froide
+              size:
+                type: string
+                description: 'Taille standard active, ou « Sur mesure ».'
+                example: Sur mesure
+              quantity: { type: integer, minimum: 1, maximum: 10, default: 1 }
+              measurements:
+                type: object
+                nullable: true
+                description: |
+                  Obligatoire lorsque `size` vaut « Sur mesure » : une entrée par
+                  mesure `required` du guide, en centimètres.
+                additionalProperties: { type: number }
+                example: { chest_cm: 98, waist_cm: 84 }
+
+    OrderCreated:
+      type: object
+      properties:
+        reference: { type: string, example: STV-2026-00A31 }
+        status: { type: string, example: pending_confirmation }
+        status_label: { type: string, example: En attente de confirmation }
+        channel: { type: string, example: whatsapp }
+        total_estimate: { type: integer, example: 153000 }
+        total_label: { type: string, example: '153 000 FCFA' }
+        currency: { type: string, example: XAF }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              summary: { type: string, example: 'Costume Signature · Noir · Laine froide · Sur mesure' }
+              quantity: { type: integer }
+              unit_price: { type: integer }
+              line_total: { type: integer }
+              custom_size: { type: boolean }
+        customer:
+          type: object
+          properties:
+            name: { type: string }
+            phone: { type: string }
+            city: { type: string, nullable: true }
+        whatsapp_url:
+          type: string
+          format: uri
+          description: Lien Click-to-Chat prérempli ; le client envoie lui-même le message.
+        created_at: { type: string, format: date-time }
+
+    OrderListItem:
+      type: object
+      properties:
+        id: { type: integer }
+        reference: { type: string }
+        status: { type: string }
+        status_label: { type: string }
+        customer:
+          type: object
+          properties:
+            name: { type: string }
+            phone: { type: string }
+            city: { type: string, nullable: true }
+        items_count: { type: integer }
+        total_estimate: { type: integer }
+        total_label: { type: string }
+        has_custom_size: { type: boolean }
+        created_at: { type: string, format: date-time }
+        confirmed_at: { type: string, format: date-time, nullable: true }
+
+    OrderDetail:
+      allOf:
+        - $ref: '#/components/schemas/OrderListItem'
+        - type: object
+          properties:
+            allowed_next_statuses:
+              type: array
+              items:
+                type: object
+                properties:
+                  value: { type: string }
+                  label: { type: string }
+            channel: { type: string }
+            currency: { type: string }
+            customer:
+              type: object
+              properties:
+                name: { type: string }
+                phone: { type: string }
+                email: { type: string, nullable: true }
+                city: { type: string, nullable: true }
+                note: { type: string, nullable: true }
+                consent_given: { type: boolean }
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: integer }
+                  product_id: { type: integer, nullable: true }
+                  snapshot:
+                    type: object
+                    description: Instantané du modèle, des options et du prix au moment de la demande.
+                  unit_price: { type: integer }
+                  quantity: { type: integer }
+                  line_total: { type: integer }
+                  custom_size: { type: boolean }
+                  measurements:
+                    type: array
+                    nullable: true
+                    description: Null lorsque le rôle n'est pas habilité à lire les mensurations.
+                    items:
+                      type: object
+                      properties:
+                        key: { type: string }
+                        label: { type: string }
+                        value: { type: number }
+                        unit: { type: string }
+            events:
+              type: array
+              items:
+                type: object
+                properties:
+                  old_status: { type: string, nullable: true }
+                  new_status: { type: string }
+                  new_status_label: { type: string }
+                  note: { type: string, nullable: true }
+                  actor: { type: string, nullable: true }
+                  created_at: { type: string, format: date-time }
