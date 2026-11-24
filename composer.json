@@ -3,13 +3,19 @@
     "name": "stive/clothing-api",
     "type": "project",
     "description": "API REST de la boutique Stive Clothing (catalogue, sur-mesure, demandes WhatsApp, administration).",
-    "keywords": ["laravel", "api", "ecommerce", "stive-clothing"],
+    "keywords": [
+        "laravel",
+        "api",
+        "ecommerce",
+        "stive-clothing"
+    ],
     "license": "proprietary",
     "require": {
-        "php": "^8.2",
         "laravel/framework": "^12.0",
         "laravel/sanctum": "^4.0",
-        "laravel/tinker": "^2.10.1"
+        "laravel/tinker": "^2.10.1",
+        "league/flysystem-aws-s3-v3": "^3.0",
+        "php": "^8.2"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

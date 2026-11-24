@@ -1,0 +1,43 @@
+name: Mettre à jour composer.lock
+
+# Workflow ponctuel : ajoute league/flysystem-aws-s3-v3 au verrou de
+# dépendances (nécessaire au disque S3 / Cloudflare R2). Sera supprimé une
+# fois le verrou régénéré.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-lock:
+    name: Régénérer composer.lock
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installer PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_pgsql, mbstring
+          coverage: none
+
+      - name: Mise à jour partielle du verrou
+        run: composer update league/flysystem-aws-s3-v3 --with-all-dependencies --prefer-dist --no-interaction --no-progress
+
+      - name: Valider le verrou
+        run: composer validate --no-check-publish
+
+      - name: Commit du verrou
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add composer.lock composer.json
+          if git diff --cached --quiet; then
+            echo "Rien à committer."
+            exit 0
+          fi
+          git commit -m "chore(deps): composer.lock — ajout de league/flysystem-aws-s3-v3 (S3/R2)"
+          git push

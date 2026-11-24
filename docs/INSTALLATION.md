@@ -1,5 +1,13 @@
 # Installation locale — API Stive Clothing (MySQL)
 
+> **Note (mise à jour)** — la base de développement et la production utilisent
+> désormais **PostgreSQL 16** (au lieu de MySQL 8). En local : `docker compose up -d db`
+> démarre Postgres 16 (port `5432`, base `stive_clothing`, identifiants `stive`/`secret`),
+> `.env.example` est déjà configuré en `DB_CONNECTION=pgsql`. Les équivalents :
+> `psql -U stive -h 127.0.0.1 stive_clothing`, extensions PHP `pdo_pgsql` et `pgsql`
+> au lieu de `pdo_mysql`. Voir [`DEPLOIEMENT-RENDER.md`](DEPLOIEMENT-RENDER.md).
+
+
 Guide pas à pas pour installer les outils, récupérer le code depuis Git et
 faire tourner l'API **Laravel 12 + MySQL 8** sur un poste de développement.
 

@@ -1,0 +1,139 @@
+# =============================================================================
+# Blueprint Render — API Stive Clothing sur l'offre GRATUITE
+#
+#   https://render.com/docs/blueprint-spec
+#
+# 1. Render → New → Blueprint → sélectionner le dépôt
+# 2. Renseigner les variables marquées « sync: false » dans le dashboard
+#    (numéro WhatsApp réel, clés R2, comptes d'administration…)
+# 3. Déployer. Le catalogue de démonstration est seedé au premier démarrage
+#    (SEED_CATALOG=true — idempotent).
+#
+# Limites de l'offre gratuite :
+#   - web service : 750 h/mois, mise en veille après 15 min sans trafic
+#     (réveil ~1 min), système de fichiers éphémère (uploads → R2 !) ;
+#   - Postgres    : 1 Go, EXPIRE 30 jours après création (puis 14 jours de
+#     grâce avant suppression) — exportez vos données ou passez en payant ;
+#   - aucun shell / worker / cron sur l'offre gratuite.
+# =============================================================================
+databases:
+  - name: stive-postgres
+    plan: free
+    databaseName: stive_clothing
+    user: stive
+    region: frankfurt
+
+services:
+  - type: web
+    name: stive-clothing-api
+    runtime: docker
+    plan: free
+    region: frankfurt
+    autoDeploy: true
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: APP_NAME
+        value: "Stive Clothing API"
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_KEY
+        generateValue: true
+      - key: APP_URL
+        value: https://stive-clothing-api.onrender.com
+      - key: APP_TIMEZONE
+        value: UTC
+      - key: APP_LOCALE
+        value: fr
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: LOG_LEVEL
+        value: error
+      - key: BCRYPT_ROUNDS
+        value: "12"
+
+      # --- Base de données (injectée depuis Render Postgres) ----------------
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_URL
+        fromDatabase:
+          name: stive-postgres
+          property: internalConnectionString
+
+      # --- Sessions / cache / queues ----------------------------------------
+      - key: SESSION_DRIVER
+        value: database
+      - key: SESSION_SECURE_COOKIE
+        value: "true"
+      - key: SESSION_SAME_SITE
+        value: lax
+      - key: SESSION_LIFETIME
+        value: "120"
+      - key: CACHE_STORE
+        value: database
+      - key: QUEUE_CONNECTION
+        value: database
+      - key: FILESYSTEM_DISK
+        value: local
+      - key: BROADCAST_CONNECTION
+        value: log
+
+      # --- CORS (frontend Cloudflare Pages) ---------------------------------
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false # ex. : https://stive-clothing.pages.dev
+      - key: CORS_SUPPORTS_CREDENTIALS
+        value: "false"
+      - key: SANCTUM_STATEFUL_DOMAINS
+        sync: false # ex. : stive-clothing.pages.dev
+      - key: SANCTUM_TOKEN_PREFIX
+        value: stv_
+      - key: SANCTUM_EXPIRATION
+        value: "480"
+
+      # --- Boutique ----------------------------------------------------------
+      - key: STIVE_WHATSAPP_NUMBER
+        sync: false # ex. : 2376XXXXXXXX (sans + ni espaces)
+      - key: STIVE_WHATSAPP_DEFAULT_MESSAGE
+        value: "Bonjour Stive Clothing, je souhaite des informations sur une pièce."
+      - key: STIVE_CURRENCY
+        value: XAF
+      - key: STIVE_ORDER_PREFIX
+        value: STV
+      - key: STIVE_ORDERS_PER_MINUTE
+        value: "5"
+      - key: STIVE_LOGIN_ATTEMPTS_PER_MINUTE
+        value: "5"
+
+      # --- Médias : Cloudflare R2 (compatible S3, 10 Go gratuits) ------------
+      - key: PRODUCT_MEDIA_DISK
+        value: s3
+      - key: PRODUCT_IMAGE_MAX_KB
+        value: "4096"
+      - key: AWS_DEFAULT_REGION
+        value: auto
+      - key: AWS_USE_PATH_STYLE_ENDPOINT
+        value: "true"
+      - key: AWS_ACCESS_KEY_ID
+        sync: false # clé R2 (Cloudflare → R2 → Manage API tokens)
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_BUCKET
+        sync: false # ex. : stive-media
+      - key: AWS_ENDPOINT
+        sync: false # ex. : https://<account_id>.r2.cloudflarestorage.com
+      - key: AWS_URL
+        sync: false # URL publique du bucket, ex. : https://pub-xxxx.r2.dev
+
+      # --- Amorçage (premier démarrage) --------------------------------------
+      - key: SEED_CATALOG
+        value: "true" # idempotent — repasser à "false" une fois en place
+      - key: CREATE_ADMIN_EMAIL
+        sync: false # ex. : direction@stive-clothing.cm — sinon aucun compte
+      - key: CREATE_ADMIN_PASSWORD
+        sync: false # mot de passe fort (≥ 10 caractères) — retirer après création
+      - key: CREATE_ADMIN_ROLE
+        value: admin
+
+      - key: MAIL_MAILER
+        value: log
