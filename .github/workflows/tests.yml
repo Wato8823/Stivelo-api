@@ -4,27 +4,27 @@ on:
   push:
     branches: [main, 'arena/**']
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
   tests:
-    name: PHP 8.3 · MySQL 8.4
+    name: PHP 8.3 · PostgreSQL 16
     runs-on: ubuntu-latest
 
     services:
-      mysql:
-        image: mysql:8.4
+      postgres:
+        image: postgres:16-alpine
         env:
-          MYSQL_DATABASE: stive_clothing_test
-          MYSQL_USER: stive
-          MYSQL_PASSWORD: secret
-          MYSQL_ROOT_PASSWORD: root-secret
+          POSTGRES_DB: stive_clothing_test
+          POSTGRES_USER: stive
+          POSTGRES_PASSWORD: secret
         ports:
-          - 3306:3306
+          - 5432:5432
         options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -ustive -psecret"
+          --health-cmd "pg_isready -U stive -d stive_clothing_test"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=10
@@ -36,14 +36,14 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
-          extensions: pdo_mysql, gd, mbstring, bcmath, intl
+          extensions: pdo_pgsql, gd, mbstring, bcmath, intl
           coverage: none
 
       - name: Cache Composer
         uses: actions/cache@v4
         with:
           path: ~/.composer/cache
-          key: composer-${{ hashFiles('composer.json') }}
+          key: composer-${{ hashFiles('composer.lock') }}
 
       - name: Installer les dépendances
         run: composer install --prefer-dist --no-interaction --no-progress

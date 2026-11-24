@@ -1,11 +1,12 @@
 # Stive Clothing — API
 
-API REST **Laravel 12 + MySQL 8** de la boutique **Stive Clothing** :
+API REST **Laravel 12 + PostgreSQL 16** de la boutique **Stive Clothing** :
 catalogue de vêtements personnalisables, prise de mesures sur mesure,
 demande de commande transmise par WhatsApp et administration sécurisée.
 
 - 📘 **Guide de développement (chaque étape)** : [`docs/DEVELOPPEMENT.md`](docs/DEVELOPPEMENT.md)
 - 🛠️ **Installation locale (outils + Git)** : [`docs/INSTALLATION.md`](docs/INSTALLATION.md)
+- 🚀 **Déploiement gratuit sur Render + Cloudflare (Pages & R2)** : [`docs/DEPLOIEMENT-RENDER.md`](docs/DEPLOIEMENT-RENDER.md)
 - 📄 **Contrat OpenAPI 3.1** : [`docs/openapi.yaml`](docs/openapi.yaml) — aussi servi par `GET /docs/openapi.yaml`
 
 ## Démarrage rapide
@@ -13,7 +14,7 @@ demande de commande transmise par WhatsApp et administration sécurisée.
 ```bash
 composer install
 cp .env.example .env && php artisan key:generate
-docker compose up -d db            # MySQL 8.4 (+ base de test)
+docker compose up -d db            # PostgreSQL 16 (+ base de test)
 php artisan migrate --seed
 php artisan storage:link
 php artisan serve                  # http://localhost:8000
@@ -53,6 +54,16 @@ Comptes de démonstration : `admin@stive-clothing.test`, `conseiller@stive-cloth
 - **Mensurations** : consentement obligatoire, accès restreint par rôle, IP hachée.
 - **Erreurs** au format unique `{ message, code, errors?, request_id }`.
 - **Limitation de débit** : 5 demandes/min et 5 connexions/min par IP.
+
+## Déploiement
+
+Le dépôt contient tout pour un hébergement **gratuit** sur Render (Docker + Postgres
+gratuit), le frontend sur Cloudflare Pages et les photos sur Cloudflare R2 :
+
+- `render.yaml` — Blueprint Render (web service + Postgres gratuit) ;
+- `Dockerfile` + `docker/start.sh` — image de production (migrations au démarrage) ;
+- `.env.production.example` — modèle de configuration de production ;
+- [`docs/DEPLOIEMENT-RENDER.md`](docs/DEPLOIEMENT-RENDER.md) — guide pas à pas.
 
 ## Licence
 

@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\CategoryController;
 use App\Http\Controllers\Api\V1\OrderController;
 use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\ShopController;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -21,13 +22,28 @@ use Illuminate\Support\Facades\Route;
 | erreurs suivent un format unique (App\Exceptions\ApiErrorRenderer).
 */
 
-Route::get('/health', fn () => response()->json([
-    'status' => 'ok',
-    'service' => config('app.name'),
-    'version' => '1.0.0',
-    'currency' => config('catalog.currency.code'),
-    'time' => now()->toIso8601String(),
-]))->name('api.health');
+// Santé de l'API, vérifiée par Render (healthCheckPath) avant de router le
+// trafic. On vérifie aussi la base : une instance sans base ne doit pas être
+// déclarée saine.
+Route::get('/health', function () {
+    try {
+        DB::select('select 1');
+        $database = 'ok';
+    } catch (\Throwable $exception) {
+        $database = 'unavailable';
+    }
+
+    $healthy = $database === 'ok';
+
+    return response()->json([
+        'status' => $healthy ? 'ok' : 'degraded',
+        'service' => config('app.name'),
+        'version' => '1.0.0',
+        'currency' => config('catalog.currency.code'),
+        'database' => $database,
+        'time' => now()->toIso8601String(),
+    ], $healthy ? 200 : 503);
+})->name('api.health');
 
 /*
 |--------------------------------------------------------------------------
