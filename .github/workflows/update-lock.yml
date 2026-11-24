@@ -3,8 +3,11 @@ name: Mettre à jour composer.lock
 # Workflow ponctuel : ajoute league/flysystem-aws-s3-v3 au verrou de
 # dépendances (nécessaire au disque S3 / Cloudflare R2). Sera supprimé une
 # fois le verrou régénéré.
+# Déclenché sur push vers la branche de travail (workflow_dispatch exigerait
+# que le fichier soit sur la branche par défaut).
 on:
-  workflow_dispatch:
+  push:
+    branches: [arena/bd67682a-stivelo-api]
 
 permissions:
   contents: write
